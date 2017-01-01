@@ -4,16 +4,19 @@ local Gdk = lgi.Gdk
 local cairo = lgi.cairo
 
 local window, header, canvas, object_listbox, stack_switcher, stack, info_bar
-local main_box, log_box
+local main_box, log_box, docs_box
 local surface
 
 require 'penzl.info_utils'
+
+local layers = require 'penzl.layers'
+local commands = require 'penzl.commands'
+local draw = require 'penzl.draw'
 
 info_bar = Gtk.InfoBar {
   show_close_button = true,
   no_show_all = true
 }
-
 
 function info_bar:on_response(r_id)
   print('response_id', r_id)
@@ -33,12 +36,14 @@ function canvas:on_configure_event(e)
   local cr = cairo.Context.create(surface)
   cr:set_source_rgb(1, 1, 1)
   cr:paint()
+  draw:init(canvas,surface) -- TODO rework?
   return true
 end
 
 function canvas:on_button_press_event(e)
   if e.button == Gdk.BUTTON_PRIMARY then
     print('mouse primary', e.x, e.y)
+    draw:rectangle(10,10,20,20) -- TODO temporary, remove, draw all layers at once
   end
   return true
 end
@@ -91,7 +96,16 @@ main_box = Gtk.Box {
   info_bar,
   Gtk.Paned {
     orientation = 'HORIZONTAL',
-    object_listbox,
+    Gtk.Paned {
+      orientation = 'VERTICAL',
+      object_listbox,
+      Gtk.Frame {
+        border_width = 0,
+        Gtk.Label {
+          label = "context menu" -- TODO implement
+        }
+      }
+    },
     Gtk.ScrolledWindow {
       expand = true,
       canvas, -- canvas
@@ -115,8 +129,19 @@ log_box = Gtk.Box {
   }
 }
 
+docs_box = Gtk.Box {
+  orientation = 'VERTICAL',
+  Gtk.ScrolledWindow {
+    Gtk.TextView {
+      id = 'docs_view',
+      editable = false
+    }
+  }
+}
+
 stack:add_titled(main_box, "main_box", "Canvas")
 stack:add_titled(log_box, "log_box", "Log")
+stack:add_titled(docs_box, "docs_box", "Docs")
 
 window = Gtk.Window {
   default_width = 800,
