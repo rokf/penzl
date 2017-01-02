@@ -1,5 +1,8 @@
 -- info_bar utils, uses global space
 
+local lgi = require 'lgi'
+local Gtk = lgi.Gtk
+
 function info_show(msg,msg_type)
   assert(info_bar, "No info_bar in global space, can't call info_show.")
   assert(type(msg) == "string", "Argument msg has to be of type string.")
