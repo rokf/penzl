@@ -3,13 +3,15 @@ local Gtk = lgi.Gtk
 local Gdk = lgi.Gdk
 local cairo = lgi.cairo
 
-local window, header, stack_switcher, stack, bottom_bar, coord_label, refresh_button
+local window, header, stack_switcher, stack, bottom_bar, coord_label
+local refresh_button, open_button, save_button, save_as_button, document_properties_button
 info_bar = nil
 canvas = nil
 surface = nil
 local editor
 
 local state = {
+  filename = nil,
   cursor_x = 0,
   cursor_y = 0
 }
@@ -84,20 +86,121 @@ stack_switcher = Gtk.StackSwitcher {
   stack = stack
 }
 
-refresh_button = Gtk.ToolButton {
-  icon_name = "view-refresh-symbolic"
-}
+refresh_button = Gtk.ToolButton { icon_name = "view-refresh" }
+open_button = Gtk.ToolButton { icon_name = "document-open" }
+save_as_button = Gtk.ToolButton { icon_name = "document-save-as" }
+save_button = Gtk.ToolButton { icon_name = "document-save" }
+document_properties_button = Gtk.ToolButton { icon_name = "document-properties" }
 
 function refresh_button:on_clicked()
   load(editor.buffer.text)()
+end
+
+function open_button:on_clicked()
+  local filename
+  local open_dialog = Gtk.FileChooserDialog {
+    title = "Open .lua file",
+    action = Gtk.FileChooserAction.OPEN,
+    transient_for = window,
+    buttons = {
+      { Gtk.STOCK_OPEN, Gtk.ResponseType.ACCEPT },
+      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
+    },
+    on_response = function (d,r)
+      if r == Gtk.ResponseType.ACCEPT then
+        filename = d:get_filename()
+      else
+        filename = nil
+      end
+      d:close()
+    end
+  }
+  open_dialog:run()
+  if filename ~= nil then
+    local file = io.open(filename, "r")
+    local str = file:read("*all")
+    file:close()
+    editor.buffer.text = str
+    state.filename = filename
+  end
+end
+
+function save_button:on_clicked()
+  if state.filename then
+    local file = io.open(state.filename, "w")
+    file:write(editor.buffer.text)
+    file:close()
+  end
+end
+
+function save_as_button:on_clicked()
+  local filename
+  local save_dialog = Gtk.FileChooserDialog {
+    title = "Save .lua file",
+    action = Gtk.FileChooserAction.SAVE,
+    transient_for = window,
+    buttons = {
+      { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
+      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
+    },
+    on_response = function (d,r)
+      if r == Gtk.ResponseType.ACCEPT then
+        filename = d:get_filename()
+      else
+        filename = nil
+      end
+      d:close()
+    end
+  }
+  local filter = Gtk.FileFilter {}
+  filter:add_pattern("*.lua")
+  filter:set_name("Lua Scripts")
+  save_dialog:add_filter(filter)
+  -- do not change state because it is save_as
+  save_dialog:run()
+  if filename ~= nil then
+    local file = io.open(filename, "w")
+    file:write(editor.buffer.text)
+    file:close()
+  end
+end
+
+function document_properties_button:on_clicked()
+  local width_entry = Gtk.Entry { placeholder_text = "width" }
+  local height_entry = Gtk.Entry { placeholder_text = "height" }
+  local dialog = Gtk.Dialog {
+    -- title = "Document Properties",
+    transient_for = window,
+    modal = true,
+    buttons = {
+      { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
+      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
+    },
+    on_response = function (d,r)
+      if r == Gtk.ResponseType.ACCEPT then
+        canvas.width = tonumber(width_entry.text)
+        canvas.height = tonumber(height_entry.text)
+      end
+    end
+  }
+  dialog:get_content_area():add(width_entry)
+  dialog:get_content_area():add(height_entry)
+  dialog:show_all()
+  dialog:run()
+  dialog:destroy()
 end
 
 header = Gtk.HeaderBar {
   title = 'penzl',
   show_close_button = true,
   custom_title = stack_switcher,
-  refresh_button
+  refresh_button,
+  open_button,
+  save_as_button,
+  save_button
 }
+
+header:pack_end(document_properties_button)
 
 editor = Gtk.TextView {
   top_margin = 5,
@@ -131,16 +234,6 @@ main_box = Gtk.Box {
   bottom_bar
 }
 
-log_box = Gtk.Box {
-  orientation = 'VERTICAL',
-  Gtk.ScrolledWindow {
-    Gtk.TextView {
-      id = 'log_view',
-      editable = false
-    }
-  }
-}
-
 docs_box = Gtk.Box {
   orientation = 'VERTICAL',
   Gtk.ScrolledWindow {
@@ -152,7 +245,6 @@ docs_box = Gtk.Box {
 }
 
 stack:add_titled(main_box, "main_box", "Canvas")
-stack:add_titled(log_box, "log_box", "Log")
 stack:add_titled(docs_box, "docs_box", "Docs")
 
 window = Gtk.Window {
