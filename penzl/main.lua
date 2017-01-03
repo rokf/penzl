@@ -42,26 +42,26 @@ function canvas:on_configure_event(e)
   local cr = cairo.Context.create(surface)
   cr:set_source_rgb(1, 1, 1)
   cr:paint()
-  -- draw:init(canvas,surface)
   draw:init()
   return true
 end
 
 function canvas:on_button_press_event(e)
   if e.button == Gdk.BUTTON_PRIMARY then
-    print('mouse primary', e.x, e.y)
+    local str = string.format("%d,%d", state.cursor_x, state.cursor_y)
+    editor.buffer:insert_at_cursor(str, #str)
   end
   return true
 end
 
 function canvas:on_motion_notify_event(e)
-  local _, x, y, state = e.window:get_device_position(e.device)
-  if state.BUTTON1_MASK then
+  local _, x, y, st = e.window:get_device_position(e.device)
+  if st.BUTTON1_MASK then
     print('mouse down',x,y)
   end
   state.cursor_x = x
   state.cursor_y = y
-  bottom_bar:queue_draw() -- TODO fix
+  coord_label.label = string.format("%d : %d", state.cursor_x, state.cursor_y)
   return true
 end
 
