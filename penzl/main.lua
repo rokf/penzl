@@ -4,11 +4,13 @@ local Gdk = lgi.Gdk
 local cairo = lgi.cairo
 
 local window, header, stack_switcher, stack, bottom_bar, coord_label
-local refresh_button, open_button, save_button, save_as_button, document_properties_button
+local refresh_button, open_button, save_button, save_as_button
+local export_button, document_properties_button
+local editor
+
 info_bar = nil
 canvas = nil
 surface = nil
-local editor
 
 local state = {
   filename = nil,
@@ -91,9 +93,19 @@ open_button = Gtk.ToolButton { icon_name = "document-open" }
 save_as_button = Gtk.ToolButton { icon_name = "document-save-as" }
 save_button = Gtk.ToolButton { icon_name = "document-save" }
 document_properties_button = Gtk.ToolButton { icon_name = "document-properties" }
+export_button = Gtk.ToolButton { icon_name = "image-x-generic" }
 
 function refresh_button:on_clicked()
-  load(editor.buffer.text)()
+  local custom_env = {
+    rect = function (x,y,w,h)
+      draw:rect(x,y,w,h)
+    end,
+    color = function (r,g,b,a)
+      draw:color(r,g,b,a)
+    end
+  }
+  draw:clear()
+  load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
 end
 
 function open_button:on_clicked()
@@ -190,6 +202,36 @@ function document_properties_button:on_clicked()
   dialog:destroy()
 end
 
+function export_button:on_clicked()
+  local filename
+  local save_dialog = Gtk.FileChooserDialog {
+    title = "Save .png file",
+    action = Gtk.FileChooserAction.SAVE,
+    transient_for = window,
+    buttons = {
+      { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
+      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
+    },
+    on_response = function (d,r)
+      if r == Gtk.ResponseType.ACCEPT then
+        filename = d:get_filename()
+      else
+        filename = nil
+      end
+      d:close()
+    end
+  }
+  local filter = Gtk.FileFilter {}
+  filter:add_pattern("*.png")
+  filter:set_name("PNG Image")
+  save_dialog:add_filter(filter)
+  save_dialog:run()
+  if filename ~= nil then
+    surface:write_to_png(filename)
+  end
+  save_dialog:destroy()
+end
+
 header = Gtk.HeaderBar {
   title = 'penzl',
   show_close_button = true,
@@ -201,6 +243,7 @@ header = Gtk.HeaderBar {
 }
 
 header:pack_end(document_properties_button)
+header:pack_end(export_button)
 
 editor = Gtk.TextView {
   top_margin = 5,
@@ -259,7 +302,8 @@ function window:on_destroy()
   Gtk.main_quit()
 end
 
-function canvas:on_key_press_event(e) -- turn back to window: ?
+-- TODO
+function canvas:on_key_press_event(e)
   local ctrl_on = e.state.CONTROL_MASK
   local shift_on = e.state.SHIFT_MASK
   return true

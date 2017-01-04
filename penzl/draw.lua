@@ -13,15 +13,20 @@ function _D:color(r,g,b,a)
   self.cr:set_source_rgba(r/255,g/255,b/255,(a or 100)/100)
 end
 
-function _D:rectangle(x,y,width,height)
-  local rect = Gdk.Rectangle {
+function _D:clear()
+  self:color(255,255,255)
+  self.cr:paint()
+end
+
+function _D:rect(x,y,width,height)
+  local r = Gdk.Rectangle {
     x = x, y = y,
     width = width, height = height
   }
   assert(surface,"Surface is nil")
-  self.cr:rectangle(rect)
+  self.cr:rectangle(r)
   self.cr:fill()
-  canvas.window:invalidate_rect(rect, false)
+  canvas.window:invalidate_rect(r, false)
 end
 
 return _D
