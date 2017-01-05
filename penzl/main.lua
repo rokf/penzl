@@ -2,11 +2,15 @@ local lgi = require 'lgi'
 local Gtk = lgi.Gtk
 local Gdk = lgi.Gdk
 local cairo = lgi.cairo
+local GtkSource = lgi.GtkSource
 
 local window, header, stack_switcher, stack, bottom_bar, coord_label
 local refresh_button, open_button, save_button, save_as_button
 local export_button, document_properties_button
 local editor
+
+local style_scheme_manager = GtkSource.StyleSchemeManager()
+local language_manager = GtkSource.LanguageManager()
 
 info_bar = nil
 canvas = nil
@@ -21,7 +25,7 @@ local state = {
 require 'penzl.info_utils'
 
 local commands = require 'penzl.commands'
-draw = require 'penzl.draw' -- was local
+local draw = require 'penzl.draw'
 
 info_bar = Gtk.InfoBar {
   show_close_button = true,
@@ -181,7 +185,6 @@ function document_properties_button:on_clicked()
   local width_entry = Gtk.Entry { placeholder_text = "width" }
   local height_entry = Gtk.Entry { placeholder_text = "height" }
   local dialog = Gtk.Dialog {
-    -- title = "Document Properties",
     transient_for = window,
     modal = true,
     buttons = {
@@ -208,6 +211,7 @@ function export_button:on_clicked()
     title = "Save .png file",
     action = Gtk.FileChooserAction.SAVE,
     transient_for = window,
+    modal = true,
     buttons = {
       { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
       { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
@@ -218,13 +222,13 @@ function export_button:on_clicked()
       else
         filename = nil
       end
-      d:close()
     end
   }
   local filter = Gtk.FileFilter {}
   filter:add_pattern("*.png")
   filter:set_name("PNG Image")
   save_dialog:add_filter(filter)
+  save_dialog:show_all()
   save_dialog:run()
   if filename ~= nil then
     surface:write_to_png(filename)
@@ -245,9 +249,13 @@ header = Gtk.HeaderBar {
 header:pack_end(document_properties_button)
 header:pack_end(export_button)
 
-editor = Gtk.TextView {
+editor = GtkSource.View {
   top_margin = 5,
   left_margin = 5,
+  buffer = GtkSource.Buffer {
+    language = language_manager.get_default():get_language("lua"),
+    style_scheme = style_scheme_manager:get_scheme("kate")
+  }
 }
 
 bottom_bar = Gtk.ActionBar {}

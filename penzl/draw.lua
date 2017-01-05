@@ -14,7 +14,7 @@ function _D:color(r,g,b,a)
 end
 
 function _D:clear()
-  self:color(255,255,255)
+  self.cr:set_source_rgba(1,1,1,1)
   self.cr:paint()
 end
 
