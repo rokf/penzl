@@ -6,7 +6,7 @@ local GtkSource = lgi.GtkSource
 
 local window, header, stack_switcher, stack, bottom_bar, coord_label
 local refresh_button, open_button, save_button, save_as_button
-local export_button, document_properties_button
+local export_button, document_properties_button, new_button
 local editor
 
 local style_scheme_manager = GtkSource.StyleSchemeManager()
@@ -22,22 +22,29 @@ local state = {
   cursor_y = 0
 }
 
-require 'penzl.info_utils'
-
 local commands = require 'penzl.commands'
 local draw = require 'penzl.draw'
 
 info_bar = Gtk.InfoBar {
-  show_close_button = true,
-  no_show_all = true
+  no_show_all = true,
+  buttons = {
+    { Gtk.STOCK_OK, Gtk.ResponseType.OK },
+    { Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL }
+  },
+  message_type = "WARNING",
+  on_response = function (b,r)
+    print('ResponseType',r)
+    if r == Gtk.ResponseType.OK then
+      state.filename = nil
+      editor.buffer.text = ""
+    end
+    b:hide()
+  end
 }
 
-function info_bar:on_response(r_id)
-  print('response_id', r_id)
-  if r_id == -7 then
-    self:hide()
-  end
-end
+info_bar:get_content_area():add(Gtk.Label {
+  label = "Begin with new file?"
+})
 
 canvas = Gtk.DrawingArea {
   width = 300,
@@ -93,6 +100,7 @@ stack_switcher = Gtk.StackSwitcher {
 }
 
 refresh_button = Gtk.ToolButton { icon_name = "view-refresh" }
+new_button = Gtk.ToolButton { icon_name = "document-new" }
 open_button = Gtk.ToolButton { icon_name = "document-open" }
 save_as_button = Gtk.ToolButton { icon_name = "document-save-as" }
 save_button = Gtk.ToolButton { icon_name = "document-save" }
@@ -106,10 +114,25 @@ function refresh_button:on_clicked()
     end,
     color = function (r,g,b,a)
       draw:color(r,g,b,a)
+    end,
+    poly = function (...)
+      draw:poly({...},false)
+    end,
+    polyf = function (...)
+      draw:poly({...},true)
+    end,
+    linew = function (w)
+      draw:linew(w)
     end
   }
   draw:clear()
   load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
+  canvas:queue_draw()
+end
+
+function new_button:on_clicked()
+  info_bar:get_content_area():show_all()
+  info_bar:show()
 end
 
 function open_button:on_clicked()
@@ -128,9 +151,12 @@ function open_button:on_clicked()
       else
         filename = nil
       end
-      d:close()
     end
   }
+  local filter = Gtk.FileFilter {}
+  filter:add_pattern("*.lua")
+  filter:set_name("Lua Scripts")
+  open_dialog:add_filter(filter)
   open_dialog:run()
   if filename ~= nil then
     local file = io.open(filename, "r")
@@ -139,6 +165,7 @@ function open_button:on_clicked()
     editor.buffer.text = str
     state.filename = filename
   end
+  open_dialog:destroy()
 end
 
 function save_button:on_clicked()
@@ -165,7 +192,6 @@ function save_as_button:on_clicked()
       else
         filename = nil
       end
-      d:close()
     end
   }
   local filter = Gtk.FileFilter {}
@@ -179,6 +205,7 @@ function save_as_button:on_clicked()
     file:write(editor.buffer.text)
     file:close()
   end
+  save_dialog:destroy()
 end
 
 function document_properties_button:on_clicked()
@@ -241,6 +268,7 @@ header = Gtk.HeaderBar {
   show_close_button = true,
   custom_title = stack_switcher,
   refresh_button,
+  new_button,
   open_button,
   save_as_button,
   save_button
