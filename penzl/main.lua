@@ -4,7 +4,8 @@ local Gdk = lgi.Gdk
 local cairo = lgi.cairo
 local GtkSource = lgi.GtkSource
 
-local window, header, stack_switcher, stack, bottom_bar, coord_label
+local window, header, stack_switcher, stack
+local bottom_bar, coord_label, mode_label
 local refresh_button, open_button, save_button, save_as_button
 local export_button, document_properties_button, new_button
 local editor
@@ -16,17 +17,20 @@ info_bar = nil
 canvas = nil
 surface = nil
 
+local commands = require 'penzl.commands'
+local draw = require 'penzl.draw'
+local modes = require 'penzl.modes'
+
 local state = {
   filename = nil,
   cursor_x = 0,
   cursor_y = 0,
   preview = {
     points = {}
-  }
+  },
+  mode = modes.poly
 }
 
-local commands = require 'penzl.commands'
-local draw = require 'penzl.draw'
 
 info_bar = Gtk.InfoBar {
   no_show_all = true,
@@ -72,7 +76,8 @@ function canvas:on_button_press_event(e)
     -- draw:poly(state.preview.points,true)
     -- canvas:queue_draw()
   elseif e.button == Gdk.BUTTON_SECONDARY then
-    local str = table.concat(state.preview.points,",")
+    -- local str = table.concat(state.preview.points,",")
+    local str = modes[state.mode.name].format(state.preview.points)
     editor.buffer:insert_at_cursor(str, #str)
     state.preview.points = {}
     -- draw:clear()
@@ -304,6 +309,11 @@ coord_label = Gtk.Label {
   label = string.format("%s : %s", state.cursor_x, state.cursor_y)
 }
 
+mode_label = Gtk.Label {
+  label = state.mode.name
+}
+
+bottom_bar:pack_start(mode_label)
 bottom_bar:pack_end(coord_label)
 
 main_box = Gtk.Box {
