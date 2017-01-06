@@ -3,6 +3,8 @@ local lgi = require 'lgi'
 local Gdk = lgi.Gdk
 local cairo = lgi.cairo
 
+local colors = require 'penzl.colors'
+
 local _D = {}
 
 function _D:init()
@@ -11,7 +13,8 @@ end
 
 function _D:color(r,g,b,a)
   if type(r) == "string" then
-
+    local c = colors[r]
+    self.cr:set_source_rgb(c[1]/255,c[2]/255,c[3]/255)
   elseif type(r) == "number" then
     self.cr:set_source_rgba(r/255,g/255,b/255,(a or 100)/100)
   end

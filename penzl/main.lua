@@ -19,7 +19,10 @@ surface = nil
 local state = {
   filename = nil,
   cursor_x = 0,
-  cursor_y = 0
+  cursor_y = 0,
+  preview = {
+    points = {}
+  }
 }
 
 local commands = require 'penzl.commands'
@@ -55,7 +58,7 @@ function canvas:on_configure_event(e)
   local allocation = self.allocation
   surface = self.window:create_similar_surface('COLOR', allocation.width, allocation.height)
   local cr = cairo.Context.create(surface)
-  cr:set_source_rgb(1, 1, 1)
+  cr:set_source_rgba(1, 1, 1, 1)
   cr:paint()
   draw:init()
   return true
@@ -63,8 +66,17 @@ end
 
 function canvas:on_button_press_event(e)
   if e.button == Gdk.BUTTON_PRIMARY then
-    local str = string.format("%d,%d", state.cursor_x, state.cursor_y)
+    table.insert(state.preview.points, string.format("%d",state.cursor_x))
+    table.insert(state.preview.points, string.format("%d",state.cursor_y))
+    -- draw:color(0,0,0,20)
+    -- draw:poly(state.preview.points,true)
+    -- canvas:queue_draw()
+  elseif e.button == Gdk.BUTTON_SECONDARY then
+    local str = table.concat(state.preview.points,",")
     editor.buffer:insert_at_cursor(str, #str)
+    state.preview.points = {}
+    -- draw:clear()
+    -- canvas:queue_draw()
   end
   return true
 end
@@ -332,19 +344,13 @@ window = Gtk.Window {
   stack,
 }
 
-window:set_titlebar(header)
-
-function window:on_destroy()
-  Gtk.main_quit()
-end
-
--- TODO
 function canvas:on_key_press_event(e)
   local ctrl_on = e.state.CONTROL_MASK
   local shift_on = e.state.SHIFT_MASK
   return true
 end
 
+window:set_titlebar(header)
+function window:on_destroy() Gtk.main_quit() end
 window:show_all()
-
 Gtk:main()
