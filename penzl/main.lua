@@ -5,7 +5,7 @@ local cairo = lgi.cairo
 local GtkSource = lgi.GtkSource
 
 local window, header, stack_switcher, stack
-local bottom_bar, coord_label, mode_label
+local bottom_bar, coord_label, mode_label, points_label, focus_img
 local refresh_button, open_button, save_button, save_as_button
 local export_button, document_properties_button, new_button
 local editor
@@ -56,6 +56,7 @@ info_bar:get_content_area():add(Gtk.Label {
 canvas = Gtk.DrawingArea {
   width = 300,
   height = 300,
+  can_focus = true,
 }
 
 function canvas:on_configure_event(e)
@@ -70,16 +71,22 @@ end
 
 function canvas:on_button_press_event(e)
   if e.button == Gdk.BUTTON_PRIMARY then
-    table.insert(state.preview.points, string.format("%d",state.cursor_x))
-    table.insert(state.preview.points, string.format("%d",state.cursor_y))
+    if not self.has_focus then
+      self:grab_focus()
+      print('setting focus on canvas')
+    else
+      table.insert(state.preview.points, string.format("%d",state.cursor_x))
+      table.insert(state.preview.points, string.format("%d",state.cursor_y))
+      points_label.label = table.concat(state.preview.points,",")
+    end
     -- draw:color(0,0,0,20)
     -- draw:poly(state.preview.points,true)
     -- canvas:queue_draw()
   elseif e.button == Gdk.BUTTON_SECONDARY then
-    -- local str = table.concat(state.preview.points,",")
     local str = modes[state.mode.name].format(state.preview.points)
     editor.buffer:insert_at_cursor(str, #str)
     state.preview.points = {}
+    points_label.label = ""
     -- draw:clear()
     -- canvas:queue_draw()
   end
@@ -101,6 +108,16 @@ function canvas:on_draw(cr)
   cr:set_source_surface(surface, 0, 0)
   cr:paint()
   return true
+end
+
+function canvas:on_focus_in_event() -- gain focus
+  focus_img.icon_name = "mail-unread-symbolic"
+end
+
+function canvas:on_focus_out_event() -- lose focus
+  focus_img.icon_name = "mail-read-symbolic"
+  state.preview.points = {}
+  points_label.label = ""
 end
 
 canvas:add_events(Gdk.EventMask {
@@ -127,7 +144,10 @@ export_button = Gtk.ToolButton { icon_name = "image-x-generic" }
 function refresh_button:on_clicked()
   local custom_env = {
     rect = function (x,y,w,h)
-      draw:rect(x,y,w,h)
+      draw:rect(x,y,w,h,false)
+    end,
+    rectf = function (x,y,w,h)
+      draw:rect(x,y,w,h,true)
     end,
     color = function (r,g,b,a)
       draw:color(r,g,b,a)
@@ -313,7 +333,22 @@ mode_label = Gtk.Label {
   label = state.mode.name
 }
 
+points_label = Gtk.Label {
+  label = ""
+}
+
+focus_img = Gtk.Image {
+  icon_name = "mail-read-symbolic",
+  icon_size = 1
+}
+
+function set_mode_label()
+  mode_label.label = state.mode.name
+end
+
 bottom_bar:pack_start(mode_label)
+bottom_bar:pack_start(points_label)
+bottom_bar:pack_end(focus_img)
 bottom_bar:pack_end(coord_label)
 
 main_box = Gtk.Box {
@@ -357,6 +392,20 @@ window = Gtk.Window {
 function canvas:on_key_press_event(e)
   local ctrl_on = e.state.CONTROL_MASK
   local shift_on = e.state.SHIFT_MASK
+  if e.keyval == Gdk.KEY_p and not shift_on then
+    print('pressed P')
+    state.mode = modes.polyf
+  elseif e.keyval == Gdk.KEY_r and not shift_on then
+    print('pressed R')
+    state.mode = modes.rectf
+  elseif e.keyval == Gdk.KEY_P and shift_on then
+    print('pressed shift+P')
+    state.mode = modes.poly
+  elseif e.keyval == Gdk.KEY_R and shift_on then
+    print('pressed shifr+R')
+    state.mode = modes.rect
+  end
+  set_mode_label()
   return true
 end
 

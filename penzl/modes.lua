@@ -21,5 +21,12 @@ return {
     format = function (p)
       return string.format("rect(%s,%s,%s,%s)", p[1], p[1], p[3], p[4])
     end
-  }
+  },
+  ["rectf"] = {
+    i = 3,
+    name = "rectf",
+    format = function (p)
+      return string.format("rectf(%s,%s,%s,%s)", p[1], p[1], p[3], p[4])
+    end
+  },
 }

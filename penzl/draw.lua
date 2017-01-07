@@ -44,15 +44,14 @@ function _D:linew(w) -- line width
   end
 end
 
-function _D:rect(x,y,width,height)
+function _D:rect(x,y,width,height,fill)
   local r = Gdk.Rectangle {
     x = x, y = y,
     width = width, height = height
   }
   assert(surface,"Surface is nil")
   self.cr:rectangle(r)
-  self.cr:fill()
-  -- canvas.window:invalidate_rect(r, false)
+  if fill then self.cr:fill() else self.cr:stroke() end
 end
 
 return _D
