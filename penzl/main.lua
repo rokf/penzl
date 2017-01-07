@@ -10,6 +10,8 @@ local refresh_button, open_button, save_button, save_as_button
 local export_button, document_properties_button, new_button
 local editor
 
+local custom_env
+
 local style_scheme_manager = GtkSource.StyleSchemeManager()
 local language_manager = GtkSource.LanguageManager()
 
@@ -78,17 +80,26 @@ function canvas:on_button_press_event(e)
       table.insert(state.preview.points, string.format("%d",state.cursor_x))
       table.insert(state.preview.points, string.format("%d",state.cursor_y))
       points_label.label = table.concat(state.preview.points,",")
+      if state.mode.min_args <= #state.preview.points then
+        -- enough arguments to draw preview
+        local preview_chunk = "color('black')\n" .. modes[state.mode.name].format(state.preview.points)
+        draw:clear()
+        load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
+        load(preview_chunk, "preview_chunk", "bt", custom_env)()
+        canvas:queue_draw()
+      end
     end
     -- draw:color(0,0,0,20)
     -- draw:poly(state.preview.points,true)
     -- canvas:queue_draw()
-  elseif e.button == Gdk.BUTTON_SECONDARY then
-    local str = modes[state.mode.name].format(state.preview.points)
+  elseif (e.button == Gdk.BUTTON_SECONDARY) and (#state.preview.points ~= 0) then
+    local str = "\n" .. modes[state.mode.name].format(state.preview.points)
     editor.buffer:insert_at_cursor(str, #str)
     state.preview.points = {}
     points_label.label = ""
-    -- draw:clear()
-    -- canvas:queue_draw()
+    draw:clear()
+    load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
+    canvas:queue_draw()
   end
   return true
 end
@@ -141,27 +152,28 @@ save_button = Gtk.ToolButton { icon_name = "document-save" }
 document_properties_button = Gtk.ToolButton { icon_name = "document-properties" }
 export_button = Gtk.ToolButton { icon_name = "image-x-generic" }
 
+custom_env = {
+  rect = function (x,y,w,h)
+    draw:rect(x,y,w,h,false)
+  end,
+  rectf = function (x,y,w,h)
+    draw:rect(x,y,w,h,true)
+  end,
+  color = function (r,g,b,a)
+    draw:color(r,g,b,a)
+  end,
+  poly = function (...)
+    draw:poly({...},false)
+  end,
+  polyf = function (...)
+    draw:poly({...},true)
+  end,
+  linew = function (w)
+    draw:linew(w)
+  end
+}
+
 function refresh_button:on_clicked()
-  local custom_env = {
-    rect = function (x,y,w,h)
-      draw:rect(x,y,w,h,false)
-    end,
-    rectf = function (x,y,w,h)
-      draw:rect(x,y,w,h,true)
-    end,
-    color = function (r,g,b,a)
-      draw:color(r,g,b,a)
-    end,
-    poly = function (...)
-      draw:poly({...},false)
-    end,
-    polyf = function (...)
-      draw:poly({...},true)
-    end,
-    linew = function (w)
-      draw:linew(w)
-    end
-  }
   draw:clear()
   load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
   canvas:queue_draw()
