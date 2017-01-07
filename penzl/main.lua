@@ -46,6 +46,7 @@ info_bar = Gtk.InfoBar {
     if r == Gtk.ResponseType.OK then
       state.filename = nil
       editor.buffer.text = ""
+      draw:clear()
     end
     b:hide()
   end
@@ -79,7 +80,12 @@ function canvas:on_button_press_event(e)
     else
       table.insert(state.preview.points, string.format("%d",state.cursor_x))
       table.insert(state.preview.points, string.format("%d",state.cursor_y))
-      points_label.label = table.concat(state.preview.points,",")
+      local pprewstr = table.concat(state.preview.points,",")
+      if #state.preview.points > 8 then
+        points_label.label = "..."
+      else
+        points_label.label = pprewstr
+      end
       if state.mode.min_args <= #state.preview.points then
         -- enough arguments to draw preview
         local preview_chunk = "color('black')\n" .. modes[state.mode.name].format(state.preview.points)
@@ -89,9 +95,6 @@ function canvas:on_button_press_event(e)
         canvas:queue_draw()
       end
     end
-    -- draw:color(0,0,0,20)
-    -- draw:poly(state.preview.points,true)
-    -- canvas:queue_draw()
   elseif (e.button == Gdk.BUTTON_SECONDARY) and (#state.preview.points ~= 0) then
     local str = "\n" .. modes[state.mode.name].format(state.preview.points)
     editor.buffer:insert_at_cursor(str, #str)
@@ -109,8 +112,13 @@ function canvas:on_motion_notify_event(e)
   if st.BUTTON1_MASK then
     print('mouse down',x,y)
   end
-  state.cursor_x = x
-  state.cursor_y = y
+  if e.state.SHIFT_MASK then
+    state.cursor_x = x - (x % 5)
+    state.cursor_y = y - (y % 5)
+  else
+    state.cursor_x = x
+    state.cursor_y = y
+  end
   coord_label.label = string.format("%d : %d", state.cursor_x, state.cursor_y)
   return true
 end
