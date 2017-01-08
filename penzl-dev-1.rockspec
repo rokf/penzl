@@ -22,7 +22,6 @@ build = {
   modules = {
     ["penzl.main"] = "penzl/main.lua",
     ["penzl.draw"] = "penzl/draw.lua",
-    ["penzl.commands"] = "penzl/commands.lua",
     ["penzl.colors"] = "penzl/colors.lua",
     ["penzl.modes"] = "penzl/modes.lua",
   },

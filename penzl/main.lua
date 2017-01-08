@@ -19,7 +19,6 @@ info_bar = nil
 canvas = nil
 surface = nil
 
-local commands = require 'penzl.commands'
 local draw = require 'penzl.draw'
 local modes = require 'penzl.modes'
 
@@ -78,8 +77,15 @@ function canvas:on_button_press_event(e)
       self:grab_focus()
       print('setting focus on canvas')
     else
-      table.insert(state.preview.points, string.format("%d",state.cursor_x))
-      table.insert(state.preview.points, string.format("%d",state.cursor_y))
+      if state.mode.max_args ~= nil then
+        if #state.preview.points < state.mode.max_args then
+          table.insert(state.preview.points, string.format("%d",state.cursor_x))
+          table.insert(state.preview.points, string.format("%d",state.cursor_y))
+        end
+      else
+        table.insert(state.preview.points, string.format("%d",state.cursor_x))
+        table.insert(state.preview.points, string.format("%d",state.cursor_y))
+      end
       local pprewstr = table.concat(state.preview.points,",")
       if #state.preview.points > 8 then
         points_label.label = "..."

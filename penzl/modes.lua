@@ -24,6 +24,7 @@ return {
     i = 1,
     name = "poly",
     min_args = 4,
+    max_args = nil,
     format = function (points)
       return string.format("poly(%s)",table.concat(points,","))
     end
@@ -32,6 +33,7 @@ return {
     i = 2,
     name = "polyf",
     min_args = 6,
+    max_args = nil,
     format = function (points)
       return string.format("polyf(%s)",table.concat(points,","))
     end
@@ -40,6 +42,7 @@ return {
     i = 3,
     name = "rect",
     min_args = 4,
+    max_args = 4,
     format = function (p)
       return string.format("rect(%s,%s,%s,%s)", p2r(p))
     end
@@ -48,6 +51,7 @@ return {
     i = 3,
     name = "rectf",
     min_args = 4,
+    max_args = 4,
     format = function (p)
       return string.format("rectf(%s,%s,%s,%s)", p2r(p))
     end
@@ -56,6 +60,7 @@ return {
     i = 4,
     name = "circ",
     min_args = 4,
+    max_args = 4,
     format = function (p)
       return string.format("circ(%s,%s,%s)", p2c(p))
     end
@@ -64,6 +69,7 @@ return {
     i = 5,
     name = "circf",
     min_args = 4,
+    max_args = 4,
     format = function (p)
       return string.format("circf(%s,%s,%s)", p2c(p))
     end
