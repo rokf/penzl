@@ -102,13 +102,15 @@ function canvas:on_button_press_event(e)
       end
     end
   elseif (e.button == Gdk.BUTTON_SECONDARY) and (#state.preview.points ~= 0) then
-    local str = "\n" .. modes[state.mode.name].format(state.preview.points)
-    editor.buffer:insert_at_cursor(str, #str)
-    state.preview.points = {}
-    points_label.label = ""
-    draw:clear()
-    load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
-    canvas:queue_draw()
+    if state.mode.min_args <= #state.preview.points then
+      local str = "\n" .. modes[state.mode.name].format(state.preview.points)
+      editor.buffer:insert_at_cursor(str, #str)
+      state.preview.points = {}
+      points_label.label = ""
+      draw:clear()
+      load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
+      canvas:queue_draw()
+    end
   end
   return true
 end
