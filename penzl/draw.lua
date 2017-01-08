@@ -11,7 +11,7 @@ function _D:init()
   self.cr = cairo.Context(surface)
 end
 
-function _D:color(r,g,b,a)
+function _D:color(r,g,b,a) -- set color
   if type(r) == "string" then
     local c = colors[r]
     self.cr:set_source_rgb(c[1]/255,c[2]/255,c[3]/255)
@@ -20,7 +20,7 @@ function _D:color(r,g,b,a)
   end
 end
 
-function _D:clear()
+function _D:clear() -- paint everything white
   self.cr:set_source_rgba(1,1,1,1)
   self.cr:paint()
 end
@@ -44,13 +44,18 @@ function _D:linew(w) -- line width
   end
 end
 
-function _D:rect(x,y,width,height,fill)
+function _D:rect(x,y,width,height,fill) -- rectangle
   local r = Gdk.Rectangle {
     x = x, y = y,
     width = width, height = height
   }
   assert(surface,"Surface is nil")
   self.cr:rectangle(r)
+  if fill then self.cr:fill() else self.cr:stroke() end
+end
+
+function _D:circ(x,y,r,fill) -- circle
+  self.cr:arc(x,y,r,0,math.rad(360))
   if fill then self.cr:fill() else self.cr:stroke() end
 end
 

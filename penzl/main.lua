@@ -178,6 +178,12 @@ custom_env = {
   end,
   linew = function (w)
     draw:linew(w)
+  end,
+  circ = function (x,y,r)
+    draw:circ(x,y,r,false)
+  end,
+  circf = function (x,y,r)
+    draw:circ(x,y,r,true)
   end
 }
 
@@ -418,12 +424,18 @@ function canvas:on_key_press_event(e)
   elseif e.keyval == Gdk.KEY_r and not shift_on then
     print('pressed R')
     state.mode = modes.rectf
+  elseif e.keyval == Gdk.KEY_c and not shift_on then
+    print('pressed C')
+    state.mode = modes.circf
   elseif e.keyval == Gdk.KEY_P and shift_on then
     print('pressed shift+P')
     state.mode = modes.poly
   elseif e.keyval == Gdk.KEY_R and shift_on then
-    print('pressed shifr+R')
+    print('pressed shift+R')
     state.mode = modes.rect
+  elseif e.keyval == Gdk.KEY_C and shift_on then
+    print('pressed shift+C')
+    state.mode = modes.circ
   end
   set_mode_label()
   return true
