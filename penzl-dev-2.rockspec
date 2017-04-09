@@ -1,13 +1,13 @@
 package = "penzl"
-version = "dev-1"
+version = "dev-2"
 
 source = {
-  url = "git://github.com/ruml/penzl.git"
+  url = "git://github.com/rokf/penzl.git"
 }
 
 description = {
   summary = "A Lua and mouse combo GTK3 vector drawing application",
-  homepage = "https://github.com/ruml/penzl",
+  homepage = "https://github.com/rokf/penzl",
   maintainer = "Rok Fajfar <snewix7@gmail.com>",
   license = "MIT"
 }
