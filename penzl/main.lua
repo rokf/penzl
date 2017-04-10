@@ -1,3 +1,4 @@
+local serpent = require 'serpent'
 local lgi = require 'lgi'
 local Gtk = lgi.Gtk
 local Gdk = lgi.Gdk
@@ -7,10 +8,27 @@ local GtkSource = lgi.GtkSource
 local window, header, stack_switcher, stack
 local bottom_bar, coord_label, mode_label, points_label, focus_img
 local refresh_button, open_button, save_button, save_as_button
-local export_button, document_properties_button, new_button
+local export_button, new_button
 local editor
 
+local cfgpath = os.getenv('HOME')..'/.config/penzl/conf.lua'
+local global_settings = dofile(cfgpath)
+
+local cssprovider = Gtk.CssProvider()
+
+function set_font()
+  local template = string.format([[
+  GtkSourceView {
+    font: %s;
+  }
+  ]], global_settings.font_name)
+  print(template)
+  cssprovider:load_from_data(template)
+end
+
 local custom_env
+
+local main_box, settings_box, docs_box
 
 local style_scheme_manager = GtkSource.StyleSchemeManager()
 local language_manager = GtkSource.LanguageManager()
@@ -165,7 +183,6 @@ new_button = Gtk.ToolButton { icon_name = "document-new" }
 open_button = Gtk.ToolButton { icon_name = "document-open" }
 save_as_button = Gtk.ToolButton { icon_name = "document-save-as" }
 save_button = Gtk.ToolButton { icon_name = "document-save" }
-document_properties_button = Gtk.ToolButton { icon_name = "document-properties" }
 export_button = Gtk.ToolButton { icon_name = "image-x-generic" }
 
 custom_env = {
@@ -279,30 +296,6 @@ function save_as_button:on_clicked()
   save_dialog:destroy()
 end
 
-function document_properties_button:on_clicked()
-  local width_entry = Gtk.Entry { placeholder_text = "width" }
-  local height_entry = Gtk.Entry { placeholder_text = "height" }
-  local dialog = Gtk.Dialog {
-    transient_for = window,
-    modal = true,
-    buttons = {
-      { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
-      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
-    },
-    on_response = function (d,r)
-      if r == Gtk.ResponseType.ACCEPT then
-        canvas.width = tonumber(width_entry.text)
-        canvas.height = tonumber(height_entry.text)
-      end
-    end
-  }
-  dialog:get_content_area():add(width_entry)
-  dialog:get_content_area():add(height_entry)
-  dialog:show_all()
-  dialog:run()
-  dialog:destroy()
-end
-
 function export_button:on_clicked()
   local filename
   local save_dialog = Gtk.FileChooserDialog {
@@ -345,17 +338,19 @@ header = Gtk.HeaderBar {
   save_button
 }
 
-header:pack_end(document_properties_button)
 header:pack_end(export_button)
 
 editor = GtkSource.View {
   top_margin = 5,
   left_margin = 5,
+  indent_width = 2,
   buffer = GtkSource.Buffer {
     language = language_manager.get_default():get_language("lua"),
     style_scheme = style_scheme_manager:get_scheme("kate")
   }
 }
+
+set_font()
 
 bottom_bar = Gtk.ActionBar {}
 
@@ -397,7 +392,10 @@ main_box = Gtk.Box {
     Gtk.ScrolledWindow {
       expand = true,
       Gtk.Fixed {
-        canvas
+        margin = 20,
+        Gtk.Frame {
+          canvas
+        }
       }
     },
   },
@@ -414,8 +412,63 @@ docs_box = Gtk.Box {
   }
 }
 
+ls_sizebox = Gtk.Box {
+  orientation = 'VERTICAL',
+  Gtk.Entry {
+    placeholder_text = 'width',
+    id = 'ls_we'
+  },
+  Gtk.Entry {
+    placeholder_text = 'height',
+    id = 'ls_he'
+  },
+}
+
+ls_sizebox:get_style_context():add_class('linked')
+
+ls_box = Gtk.Box { -- local settings
+  orientation = 'VERTICAL',
+  margin = 20,
+  ls_sizebox,
+}
+
+ls_box:pack_end(Gtk.Button {
+  label = 'Save',
+  on_clicked = function (_)
+    canvas.width = tonumber(window.child.ls_we.text)
+    canvas.height = tonumber(window.child.ls_he.text)
+    stack:set_visible_child_name('main_box')
+  end
+},false,false,0)
+
+gs_box = Gtk.Box { -- global settings
+  orientation = 'VERTICAL',
+  margin = 20,
+  Gtk.Box {
+    orientation = 'HORIZONTAL',
+    Gtk.FontButton {
+      font_name = global_settings.font_name,
+      on_font_set = function (font_button)
+        global_settings.font_name = font_button.font_name
+        set_font()
+      end
+    }
+  }
+}
+
+settings_box = Gtk.Box {
+  orientation = 'VERTICAL',
+  Gtk.Paned {
+    expand = true,
+    orientation = 'HORIZONTAL',
+    ls_box,
+    gs_box
+  }
+}
+
 stack:add_titled(main_box, "main_box", "Canvas")
 stack:add_titled(docs_box, "docs_box", "Docs")
+stack:add_titled(settings_box, "settings_box", "Settings")
 
 window = Gtk.Window {
   default_width = 800,
@@ -423,26 +476,23 @@ window = Gtk.Window {
   stack,
 }
 
+local style_context = window:get_style_context()
+style_context.add_provider_for_screen(window:get_screen(),cssprovider, 0)
+
 function canvas:on_key_press_event(e)
   local ctrl_on = e.state.CONTROL_MASK
   local shift_on = e.state.SHIFT_MASK
   if e.keyval == Gdk.KEY_p and not shift_on then
-    print('pressed P')
     state.mode = modes.polyf
   elseif e.keyval == Gdk.KEY_r and not shift_on then
-    print('pressed R')
     state.mode = modes.rectf
   elseif e.keyval == Gdk.KEY_c and not shift_on then
-    print('pressed C')
     state.mode = modes.circf
   elseif e.keyval == Gdk.KEY_P and shift_on then
-    print('pressed shift+P')
     state.mode = modes.poly
   elseif e.keyval == Gdk.KEY_R and shift_on then
-    print('pressed shift+R')
     state.mode = modes.rect
   elseif e.keyval == Gdk.KEY_C and shift_on then
-    print('pressed shift+C')
     state.mode = modes.circ
   end
   set_mode_label()
@@ -450,6 +500,11 @@ function canvas:on_key_press_event(e)
 end
 
 window:set_titlebar(header)
-function window:on_destroy() Gtk.main_quit() end
+function window:on_destroy()
+  local file = io.open(cfgpath,"w")
+  file:write(serpent.dump(global_settings, {comment = false}))
+  file:close()
+  Gtk.main_quit()
+end
 window:show_all()
 Gtk:main()

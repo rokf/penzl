@@ -5,13 +5,13 @@ local cairo = lgi.cairo
 
 local colors = require 'penzl.colors'
 
-local _D = {}
+local D = {}
 
-function _D:init()
+function D:init()
   self.cr = cairo.Context(surface)
 end
 
-function _D:color(r,g,b,a) -- set color
+function D:color(r,g,b,a) -- set color
   if type(r) == "string" then
     local c = colors[r]
     self.cr:set_source_rgb(c[1]/255,c[2]/255,c[3]/255)
@@ -20,12 +20,12 @@ function _D:color(r,g,b,a) -- set color
   end
 end
 
-function _D:clear() -- paint everything white
+function D:clear() -- paint everything white
   self.cr:set_source_rgba(1,1,1,1)
   self.cr:paint()
 end
 
-function _D:poly(arg,fill) -- polygon
+function D:poly(arg,fill) -- polygon
   for i=1, #arg, 2 do
     if i==1 then
       print('move',arg[i],arg[i+1])
@@ -38,13 +38,13 @@ function _D:poly(arg,fill) -- polygon
   if fill then self.cr:fill() else self.cr:stroke() end
 end
 
-function _D:linew(w) -- line width
+function D:linew(w) -- line width
   if type(w) == "number" then
     self.cr.line_width = w
   end
 end
 
-function _D:rect(x,y,width,height,fill) -- rectangle
+function D:rect(x,y,width,height,fill) -- rectangle
   local r = Gdk.Rectangle {
     x = x, y = y,
     width = width, height = height
@@ -54,9 +54,9 @@ function _D:rect(x,y,width,height,fill) -- rectangle
   if fill then self.cr:fill() else self.cr:stroke() end
 end
 
-function _D:circ(x,y,r,fill) -- circle
+function D:circ(x,y,r,fill) -- circle
   self.cr:arc(x,y,r,0,math.rad(360))
   if fill then self.cr:fill() else self.cr:stroke() end
 end
 
-return _D
+return D
