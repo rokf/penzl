@@ -59,4 +59,20 @@ function D:circ(x,y,r,fill) -- circle
   if fill then self.cr:fill() else self.cr:stroke() end
 end
 
+function D:arc(x,y,r,a,sa,fill)
+  local start_a = 0
+  if sa then start_a = math.rad(sa) end
+  print('arc sa:',sa,'rad:',start_a)
+  self.cr:arc(x,y,r,start_a,math.rad(a))
+  if fill then self.cr:fill() else self.cr:stroke() end
+end
+
+function D:arcn(x,y,r,a,sa,fill)
+  local start_a = 0
+  if sa then local start_a = math.rad(sa) end
+  print('arcn sa:',sa,'rad:',start_a)
+  self.cr:arc_negative(x,y,r,start_a,math.rad(a))
+  if fill then self.cr:fill() else self.cr:stroke() end
+end
+
 return D

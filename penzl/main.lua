@@ -209,6 +209,18 @@ custom_env = {
   end,
   circf = function (x,y,r)
     draw:circ(x,y,r,true)
+  end,
+  arc = function (x,y,r,a,sa)
+    draw:arc(x,y,r,a,sa,false)
+  end,
+  arcf = function (x,y,r,a,sa)
+    draw:arc(x,y,r,a,sa,true)
+  end,
+  arcn = function (x,y,r,a,sa)
+    draw:arcn(x,y,r,a,sa,false)
+  end,
+  arcnf = function (x,y,r,a,sa)
+    draw:arcn(x,y,r,a,sa,true)
   end
 }
 
