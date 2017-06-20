@@ -1,12 +1,12 @@
 package = "penzl"
-version = "dev-2"
+version = "dev-3"
 
 source = {
   url = "git://github.com/rokf/penzl.git"
 }
 
 description = {
-  summary = "A Lua and mouse combo GTK3 vector drawing application",
+  summary = "Draw with Lua code",
   homepage = "https://github.com/rokf/penzl",
   maintainer = "Rok Fajfar <snewix7@gmail.com>",
   license = "MIT"
@@ -14,17 +14,13 @@ description = {
 
 dependencies = {
   "lua >= 5.1",
-  "lgi",
-  "serpent"
+  "lgi"
 }
 
 build = {
   type = "builtin",
   modules = {
     ["penzl.main"] = "penzl/main.lua",
-    ["penzl.draw"] = "penzl/draw.lua",
-    ["penzl.colors"] = "penzl/colors.lua",
-    ["penzl.modes"] = "penzl/modes.lua",
   },
   install = {
     bin = { "bin/penzl" }

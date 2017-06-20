@@ -1,522 +1,99 @@
-local serpent = require 'serpent'
+local lfs = require 'lfs'
 local lgi = require 'lgi'
 local Gtk = lgi.Gtk
+local GLib = lgi.GLib
 local Gdk = lgi.Gdk
 local cairo = lgi.cairo
-local GtkSource = lgi.GtkSource
 
-local window, header, stack_switcher, stack
-local bottom_bar, coord_label, mode_label, points_label, focus_img
-local refresh_button, open_button, save_button, save_as_button
-local export_button, new_button
-local editor
+local modification_time = 0
+local source_text = ''
 
-local cfgpath = os.getenv('HOME')..'/.config/penzl/conf.lua'
-local global_settings = dofile(cfgpath)
-
-local cssprovider = Gtk.CssProvider()
-
-function set_font()
-  local template = string.format([[
-  GtkSourceView {
-    font: %s;
-  }
-  ]], global_settings.font_name)
-  print(template)
-  cssprovider:load_from_data(template)
-end
-
-local custom_env
-
-local main_box, settings_box, docs_box
-
-local style_scheme_manager = GtkSource.StyleSchemeManager()
-local language_manager = GtkSource.LanguageManager()
-
-info_bar = nil
-canvas = nil
-surface = nil
-
-local draw = require 'penzl.draw'
-local modes = require 'penzl.modes'
-
-local state = {
-  filename = nil,
-  cursor_x = 0,
-  cursor_y = 0,
-  preview = {
-    points = {}
-  },
-  mode = modes.poly
-}
-
-
-info_bar = Gtk.InfoBar {
-  no_show_all = true,
-  buttons = {
-    { Gtk.STOCK_OK, Gtk.ResponseType.OK },
-    { Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL }
-  },
-  message_type = "WARNING",
-  on_response = function (b,r)
-    print('ResponseType',r)
-    if r == Gtk.ResponseType.OK then
-      state.filename = nil
-      editor.buffer.text = ""
-      draw:clear()
-    end
-    b:hide()
-  end
-}
-
-info_bar:get_content_area():add(Gtk.Label {
-  label = "Begin with new file?"
-})
-
-canvas = Gtk.DrawingArea {
-  width = 300,
-  height = 300,
-  can_focus = true,
-}
-
-function canvas:on_configure_event(e)
-  local allocation = self.allocation
-  surface = self.window:create_similar_surface('COLOR', allocation.width, allocation.height)
-  local cr = cairo.Context.create(surface)
-  cr:set_source_rgba(1, 1, 1, 1)
-  cr:paint()
-  draw:init()
-  return true
-end
-
-function canvas:on_button_press_event(e)
-  if e.button == Gdk.BUTTON_PRIMARY then
-    if not self.has_focus then
-      self:grab_focus()
-      print('setting focus on canvas')
-    else
-      if state.mode.max_args ~= nil then
-        if #state.preview.points < state.mode.max_args then
-          table.insert(state.preview.points, string.format("%d",state.cursor_x))
-          table.insert(state.preview.points, string.format("%d",state.cursor_y))
+local function render(cr)
+  local r, err = load(source_text, 'source_chunk', 'bt', {
+    col = function (r,g,b,a)
+      cr:set_source_rgba(r,g,b,a or 1)
+    end,
+    rect = function (x,y,w,h)
+      cr:rectangle(Gdk.Rectangle {
+        x = x, y = y, width = w, height = h
+      })
+    end,
+    circ = function (x,y,r)
+      cr:arc(x,y,r,0,math.rad(360))
+    end,
+    poly = function (t)
+      for i=1, #t, 2 do
+        if i == 1 then
+          cr:move_to(t[i],t[i+1])
+        else
+          cr:line_to(t[i],t[i+1])
         end
-      else
-        table.insert(state.preview.points, string.format("%d",state.cursor_x))
-        table.insert(state.preview.points, string.format("%d",state.cursor_y))
       end
-      local pprewstr = table.concat(state.preview.points,",")
-      if #state.preview.points > 8 then
-        points_label.label = "..."
-      else
-        points_label.label = pprewstr
-      end
-      if state.mode.min_args <= #state.preview.points then
-        -- enough arguments to draw preview
-        local preview_chunk = "color('black')\n" .. modes[state.mode.name].format(state.preview.points)
-        draw:clear()
-        load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
-        load(preview_chunk, "preview_chunk", "bt", custom_env)()
-        canvas:queue_draw()
-      end
+    end,
+    fill = function ()
+      cr:fill()
+    end,
+    stroke = function ()
+      cr:stroke()
     end
-  elseif (e.button == Gdk.BUTTON_SECONDARY) and (#state.preview.points ~= 0) then
-    if state.mode.min_args <= #state.preview.points then
-      local str = "\n" .. modes[state.mode.name].format(state.preview.points)
-      editor.buffer:insert_at_cursor(str, #str)
-      state.preview.points = {}
-      points_label.label = ""
-      draw:clear()
-      load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
-      canvas:queue_draw()
-    end
-  end
-  return true
-end
+  })
 
-function canvas:on_motion_notify_event(e)
-  local _, x, y, st = e.window:get_device_position(e.device)
-  if st.BUTTON1_MASK then
-    print('mouse down',x,y)
-  end
-  if e.state.SHIFT_MASK then
-    state.cursor_x = x - (x % 5)
-    state.cursor_y = y - (y % 5)
+  cr:set_source_rgb(0,0,0)
+
+  if not r then
+    print('error:', err)
   else
-    state.cursor_x = x
-    state.cursor_y = y
+    r()
   end
-  coord_label.label = string.format("%d : %d", state.cursor_x, state.cursor_y)
-  return true
 end
 
-function canvas:on_draw(cr)
-  cr:set_source_surface(surface, 0, 0)
-  cr:paint()
-  return true
-end
-
-function canvas:on_focus_in_event() -- gain focus
-  focus_img.icon_name = "mail-unread-symbolic"
-end
-
-function canvas:on_focus_out_event() -- lose focus
-  focus_img.icon_name = "mail-read-symbolic"
-  state.preview.points = {}
-  points_label.label = ""
-end
-
-canvas:add_events(Gdk.EventMask {
-  'LEAVE_NOTIFY_MASK',
-  'BUTTON_PRESS_MASK',
-  'POINTER_MOTION_MASK',
-  'POINTER_MOTION_HINT_MASK'
-})
-
-stack = Gtk.Stack {}
-
-stack_switcher = Gtk.StackSwitcher {
-  stack = stack
-}
-
-refresh_button = Gtk.ToolButton { icon_name = "view-refresh" }
-new_button = Gtk.ToolButton { icon_name = "document-new" }
-open_button = Gtk.ToolButton { icon_name = "document-open" }
-save_as_button = Gtk.ToolButton { icon_name = "document-save-as" }
-save_button = Gtk.ToolButton { icon_name = "document-save" }
-export_button = Gtk.ToolButton { icon_name = "image-x-generic" }
-
-custom_env = {
-  rect = function (x,y,w,h)
-    draw:rect(x,y,w,h,false)
-  end,
-  rectf = function (x,y,w,h)
-    draw:rect(x,y,w,h,true)
-  end,
-  color = function (r,g,b,a)
-    draw:color(r,g,b,a)
-  end,
-  poly = function (...)
-    draw:poly({...},false)
-  end,
-  polyf = function (...)
-    draw:poly({...},true)
-  end,
-  linew = function (w)
-    draw:linew(w)
-  end,
-  circ = function (x,y,r)
-    draw:circ(x,y,r,false)
-  end,
-  circf = function (x,y,r)
-    draw:circ(x,y,r,true)
-  end,
-  arc = function (x,y,r,a,sa)
-    draw:arc(x,y,r,a,sa,false)
-  end,
-  arcf = function (x,y,r,a,sa)
-    draw:arc(x,y,r,a,sa,true)
-  end,
-  arcn = function (x,y,r,a,sa)
-    draw:arcn(x,y,r,a,sa,false)
-  end,
-  arcnf = function (x,y,r,a,sa)
-    draw:arcn(x,y,r,a,sa,true)
+local function show_preview(filename)
+  local canvas = Gtk.DrawingArea {
+    width = 500,
+    height = 500
+  }
+  function canvas:on_draw(cr)
+    render(cr)
+    return true
   end
-}
-
-function refresh_button:on_clicked()
-  draw:clear()
-  load(editor.buffer.text, "editor_chunk", "bt", custom_env)()
-  canvas:queue_draw()
-end
-
-function new_button:on_clicked()
-  info_bar:get_content_area():show_all()
-  info_bar:show()
-end
-
-function open_button:on_clicked()
-  local filename
-  local open_dialog = Gtk.FileChooserDialog {
-    title = "Open .lua file",
-    action = Gtk.FileChooserAction.OPEN,
-    transient_for = window,
-    buttons = {
-      { Gtk.STOCK_OPEN, Gtk.ResponseType.ACCEPT },
-      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
-    },
-    on_response = function (d,r)
-      if r == Gtk.ResponseType.ACCEPT then
-        filename = d:get_filename()
-      else
-        filename = nil
-      end
+  local timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, function ()
+    -- watch file for changes and update the view
+    local mtime = lfs.attributes(filename, 'modification')
+    if mtime > modification_time then
+      print('modified, redrawing')
+      local file = io.open(filename,'r')
+      source_text = file:read('*all')
+      file:close()
+      canvas:queue_draw()
+      modification_time = mtime
+    end
+    return true
+  end)
+  local window = Gtk.Window {
+    title = 'penzl',
+    width_request = 500,
+    height_request = 500,
+    canvas,
+    on_destroy = function (_)
+      GLib.source_remove(timer)
+      Gtk.main_quit()
     end
   }
-  local filter = Gtk.FileFilter {}
-  filter:add_pattern("*.lua")
-  filter:set_name("Lua Scripts")
-  open_dialog:add_filter(filter)
-  open_dialog:run()
-  if filename ~= nil then
-    local file = io.open(filename, "r")
-    local str = file:read("*all")
-    file:close()
-    editor.buffer.text = str
-    state.filename = filename
-  end
-  open_dialog:destroy()
+  window:show_all()
+  Gtk:main()
 end
 
-function save_button:on_clicked()
-  if state.filename then
-    local file = io.open(state.filename, "w")
-    file:write(editor.buffer.text)
-    file:close()
-  end
-end
+if #arg == 1 then
+  show_preview(arg[1])
+else
+  local surface = cairo.ImageSurface.create('ARGB32', tonumber(arg[2]), tonumber(arg[3]))
+  local cr = cairo.Context.create(surface)
 
-function save_as_button:on_clicked()
-  local filename
-  local save_dialog = Gtk.FileChooserDialog {
-    title = "Save .lua file",
-    action = Gtk.FileChooserAction.SAVE,
-    transient_for = window,
-    buttons = {
-      { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
-      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
-    },
-    on_response = function (d,r)
-      if r == Gtk.ResponseType.ACCEPT then
-        filename = d:get_filename()
-      else
-        filename = nil
-      end
-    end
-  }
-  local filter = Gtk.FileFilter {}
-  filter:add_pattern("*.lua")
-  filter:set_name("Lua Scripts")
-  save_dialog:add_filter(filter)
-  -- do not change state because it is save_as
-  save_dialog:run()
-  if filename ~= nil then
-    local file = io.open(filename, "w")
-    file:write(editor.buffer.text)
-    file:close()
-  end
-  save_dialog:destroy()
-end
-
-function export_button:on_clicked()
-  local filename
-  local save_dialog = Gtk.FileChooserDialog {
-    title = "Save .png file",
-    action = Gtk.FileChooserAction.SAVE,
-    transient_for = window,
-    modal = true,
-    buttons = {
-      { Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT },
-      { Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL }
-    },
-    on_response = function (d,r)
-      if r == Gtk.ResponseType.ACCEPT then
-        filename = d:get_filename()
-      else
-        filename = nil
-      end
-    end
-  }
-  local filter = Gtk.FileFilter {}
-  filter:add_pattern("*.png")
-  filter:set_name("PNG Image")
-  save_dialog:add_filter(filter)
-  save_dialog:show_all()
-  save_dialog:run()
-  if filename ~= nil then
-    surface:write_to_png(filename)
-  end
-  save_dialog:destroy()
-end
-
-header = Gtk.HeaderBar {
-  title = 'penzl',
-  show_close_button = true,
-  custom_title = stack_switcher,
-  refresh_button,
-  new_button,
-  open_button,
-  save_as_button,
-  save_button
-}
-
-header:pack_end(export_button)
-
-editor = GtkSource.View {
-  top_margin = 5,
-  left_margin = 5,
-  indent_width = 2,
-  buffer = GtkSource.Buffer {
-    language = language_manager.get_default():get_language("lua"),
-    style_scheme = style_scheme_manager:get_scheme("kate")
-  }
-}
-
-set_font()
-
-bottom_bar = Gtk.ActionBar {}
-
-coord_label = Gtk.Label {
-  label = string.format("%s : %s", state.cursor_x, state.cursor_y)
-}
-
-mode_label = Gtk.Label {
-  label = state.mode.name
-}
-
-points_label = Gtk.Label {
-  label = ""
-}
-
-focus_img = Gtk.Image {
-  icon_name = "mail-read-symbolic",
-  icon_size = 1
-}
-
-function set_mode_label()
-  mode_label.label = state.mode.name
-end
-
-bottom_bar:pack_start(mode_label)
-bottom_bar:pack_start(points_label)
-bottom_bar:pack_end(focus_img)
-bottom_bar:pack_end(coord_label)
-
-main_box = Gtk.Box {
-  orientation = "VERTICAL",
-  info_bar,
-  Gtk.Paned {
-    orientation = 'HORIZONTAL',
-    Gtk.ScrolledWindow {
-      width = 200,
-      editor
-    },
-    Gtk.ScrolledWindow {
-      expand = true,
-      Gtk.Fixed {
-        margin = 20,
-        Gtk.Frame {
-          canvas
-        }
-      }
-    },
-  },
-  bottom_bar
-}
-
-docs_box = Gtk.Box {
-  orientation = 'VERTICAL',
-  Gtk.ScrolledWindow {
-    Gtk.TextView {
-      id = 'docs_view',
-      editable = false
-    }
-  }
-}
-
-ls_sizebox = Gtk.Box {
-  orientation = 'VERTICAL',
-  Gtk.Entry {
-    placeholder_text = 'width',
-    id = 'ls_we'
-  },
-  Gtk.Entry {
-    placeholder_text = 'height',
-    id = 'ls_he'
-  },
-}
-
-ls_sizebox:get_style_context():add_class('linked')
-
-ls_box = Gtk.Box { -- local settings
-  orientation = 'VERTICAL',
-  margin = 20,
-  ls_sizebox,
-}
-
-ls_box:pack_end(Gtk.Button {
-  label = 'Save',
-  on_clicked = function (_)
-    canvas.width = tonumber(window.child.ls_we.text)
-    canvas.height = tonumber(window.child.ls_he.text)
-    stack:set_visible_child_name('main_box')
-  end
-},false,false,0)
-
-gs_box = Gtk.Box { -- global settings
-  orientation = 'VERTICAL',
-  margin = 20,
-  Gtk.Box {
-    orientation = 'HORIZONTAL',
-    Gtk.FontButton {
-      font_name = global_settings.font_name,
-      on_font_set = function (font_button)
-        global_settings.font_name = font_button.font_name
-        set_font()
-      end
-    }
-  }
-}
-
-settings_box = Gtk.Box {
-  orientation = 'VERTICAL',
-  Gtk.Paned {
-    expand = true,
-    orientation = 'HORIZONTAL',
-    ls_box,
-    gs_box
-  }
-}
-
-stack:add_titled(main_box, "main_box", "Canvas")
-stack:add_titled(docs_box, "docs_box", "Docs")
-stack:add_titled(settings_box, "settings_box", "Settings")
-
-window = Gtk.Window {
-  default_width = 800,
-  default_height = 600,
-  stack,
-}
-
-local style_context = window:get_style_context()
-style_context.add_provider_for_screen(window:get_screen(),cssprovider, 0)
-
-function canvas:on_key_press_event(e)
-  local ctrl_on = e.state.CONTROL_MASK
-  local shift_on = e.state.SHIFT_MASK
-  if e.keyval == Gdk.KEY_p and not shift_on then
-    state.mode = modes.polyf
-  elseif e.keyval == Gdk.KEY_r and not shift_on then
-    state.mode = modes.rectf
-  elseif e.keyval == Gdk.KEY_c and not shift_on then
-    state.mode = modes.circf
-  elseif e.keyval == Gdk.KEY_P and shift_on then
-    state.mode = modes.poly
-  elseif e.keyval == Gdk.KEY_R and shift_on then
-    state.mode = modes.rect
-  elseif e.keyval == Gdk.KEY_C and shift_on then
-    state.mode = modes.circ
-  end
-  set_mode_label()
-  return true
-end
-
-window:set_titlebar(header)
-function window:on_destroy()
-  local file = io.open(cfgpath,"w")
-  file:write(serpent.dump(global_settings, {comment = false}))
+  local file = io.open(arg[1],'r')
+  source_text = file:read('*all')
   file:close()
-  Gtk.main_quit()
+
+  render(cr)
+
+  surface:write_to_png(arg[4])
 end
-window:show_all()
-Gtk:main()
